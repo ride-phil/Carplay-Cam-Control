@@ -66,6 +66,9 @@ workflows:
           xcode-project use-profiles
           echo "--- pbxproj GENERATE_INFOPLIST_FILE occurrences (post use-profiles) ---"
           grep -n "GENERATE_INFOPLIST_FILE\|INFOPLIST_FILE" AceProRecorder.xcodeproj/project.pbxproj
+          echo "--- Source Info.plist files on disk (post use-profiles, pre-archive) ---"
+          echo "App:" && cat AceProRecorder/Info.plist
+          echo "Widget:" && cat AceProRecorderWidget/Info.plist
           xcodebuild archive \
             -project AceProRecorder.xcodeproj \
             -scheme "$XCODE_SCHEME" \
