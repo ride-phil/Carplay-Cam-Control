@@ -1,5 +1,6 @@
 import Foundation
 import CoreBluetooth
+import WidgetKit
 
 struct PairedCamera {
     let uuid: UUID
@@ -12,6 +13,8 @@ final class PairingManager: NSObject, ObservableObject {
     @Published var pairedCamera: PairedCamera?
     @Published var isScanning = false
     @Published var isPairing = false
+    @Published var isRecording = SharedState.isRecording
+    @Published var isSendingCommand = false
     @Published var errorMessage: String?
 
     private var central: CBCentralManager!
@@ -54,6 +57,44 @@ final class PairingManager: NSObject, ObservableObject {
         SharedState.pairedCameraType = nil
         pairedCamera = nil
         if let p = pairingTarget { central.cancelPeripheralConnection(p) }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func startRecording() async {
+        await runCommand { driver in try await driver.startRecording() }
+        if errorMessage == nil {
+            isRecording = true
+            SharedState.isRecording = true
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+
+    func stopRecording() async {
+        await runCommand { driver in try await driver.stopRecording() }
+        if errorMessage == nil {
+            isRecording = false
+            SharedState.isRecording = false
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+
+    func takePhoto() async {
+        await runCommand { driver in try await driver.takePhoto() }
+    }
+
+    private func runCommand(_ action: @escaping (CameraDriver) async throws -> Void) async {
+        guard let camera = pairedCamera else { return }
+        isSendingCommand = true
+        errorMessage = nil
+        let driver = CameraDriverFactory.make(for: camera.type)
+        do {
+            try await driver.connect(peripheralID: camera.uuid)
+            try await action(driver)
+            driver.disconnect()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isSendingCommand = false
     }
 
     private func cameraType(for peripheral: CBPeripheral) -> CameraType? {
@@ -125,6 +166,7 @@ extension PairingManager: CBPeripheralDelegate {
             pairedCamera = PairedCamera(uuid: peripheral.identifier, type: type)
             isPairing = false
             central.cancelPeripheralConnection(peripheral)
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 }

@@ -30,11 +30,49 @@ struct PairingView: View {
         VStack(spacing: 24) {
             Image(systemName: "camera.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(.green)
+                .foregroundStyle(manager.isRecording ? .red : .green)
             Text(camera.type.displayName)
                 .font(.title2.bold())
-            Text("Paired — widget is ready")
+            Text(manager.isRecording ? "Recording" : "Paired — ready")
                 .foregroundStyle(.secondary)
+
+            VStack(spacing: 12) {
+                Button {
+                    Task { await manager.startRecording() }
+                } label: {
+                    Label("Record", systemImage: "record.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .disabled(manager.isRecording || manager.isSendingCommand)
+
+                Button {
+                    Task { await manager.stopRecording() }
+                } label: {
+                    Label("Stop", systemImage: "stop.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!manager.isRecording || manager.isSendingCommand)
+
+                Button {
+                    Task { await manager.takePhoto() }
+                } label: {
+                    Label("Take Photo", systemImage: "camera.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(manager.isSendingCommand)
+            }
+            .padding(.horizontal)
+
+            if let error = manager.errorMessage {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+                    .font(.callout)
+            }
+
             Button("Unpair", role: .destructive) {
                 manager.unpair()
             }
