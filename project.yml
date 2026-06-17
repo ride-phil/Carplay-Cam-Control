@@ -21,8 +21,6 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
-    entitlements:
-      path: AceProRecorder/AceProRecorder.entitlements
     sources:
       - path: AceProRecorder
         createIntermediateGroups: true
@@ -41,13 +39,12 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.camcontrol.app
         INFOPLIST_FILE: AceProRecorder/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AceProRecorder/AceProRecorder.entitlements
 
   AceProRecorderWidget:
     type: app-extension
     platform: iOS
     deploymentTarget: "17.0"
-    entitlements:
-      path: AceProRecorderWidget/AceProRecorderWidget.entitlements
     sources:
       - path: AceProRecorderWidget
         createIntermediateGroups: true
@@ -60,3 +57,4 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.camcontrol.app.widget
         INFOPLIST_FILE: AceProRecorderWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AceProRecorderWidget/AceProRecorderWidget.entitlements
