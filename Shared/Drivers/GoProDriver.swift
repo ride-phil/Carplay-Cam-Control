@@ -4,7 +4,7 @@ import CoreBluetooth
 // GoPro Open API BLE — https://gopro.github.io/OpenGoPro/ble_2_0
 // Works with Hero 9 Black and later. Uses service FEA6, TLV command packets.
 final class GoProDriver: NSObject, CameraDriver {
-    private static let bleQueue = DispatchQueue(label: "com.ridephilippines.aceprorecorder.ble.gopro")
+    private static let bleQueue = DispatchQueue(label: "io.camcontrol.app.ble.gopro")
 
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?

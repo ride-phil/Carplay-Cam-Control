@@ -1,6 +1,6 @@
 name: AceProRecorder
 options:
-  bundleIdPrefix: com.ridephilippines
+  bundleIdPrefix: io.camcontrol
   deploymentTarget:
     iOS: "17.0"
   developmentLanguage: en
@@ -37,7 +37,7 @@ targets:
         codeSign: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ridephilippines.aceprorecorder
+        PRODUCT_BUNDLE_IDENTIFIER: io.camcontrol.app
 
   AceProRecorderWidget:
     type: app-extension
@@ -57,4 +57,4 @@ targets:
         createIntermediateGroups: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ridephilippines.aceprorecorder.widget
+        PRODUCT_BUNDLE_IDENTIFIER: io.camcontrol.app.widget

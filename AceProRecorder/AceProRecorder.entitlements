@@ -4,7 +4,7 @@
 <dict>
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>group.com.ridephilippines.aceprorecorder</string>
+        <string>group.io.camcontrol.app</string>
     </array>
 </dict>
 </plist>

@@ -2,7 +2,7 @@ import Foundation
 import CoreBluetooth
 
 final class Insta360AceProDriver: NSObject, CameraDriver {
-    private static let bleQueue = DispatchQueue(label: "com.ridephilippines.aceprorecorder.ble.insta360")
+    private static let bleQueue = DispatchQueue(label: "io.camcontrol.app.ble.insta360")
 
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?

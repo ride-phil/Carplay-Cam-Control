@@ -1,7 +1,7 @@
 import Foundation
 
 struct SharedState {
-    private static let suite = "group.com.ridephilippines.aceprorecorder"
+    private static let suite = "group.io.camcontrol.app"
     private static var defaults: UserDefaults { UserDefaults(suiteName: suite)! }
 
     private enum Keys {
