@@ -21,8 +21,6 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
-    info:
-      path: AceProRecorder/Info.plist
     entitlements:
       path: AceProRecorder/AceProRecorder.entitlements
     sources:
@@ -42,13 +40,12 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.camcontrol.app
+        INFOPLIST_FILE: AceProRecorder/Info.plist
 
   AceProRecorderWidget:
     type: app-extension
     platform: iOS
     deploymentTarget: "17.0"
-    info:
-      path: AceProRecorderWidget/Info.plist
     entitlements:
       path: AceProRecorderWidget/AceProRecorderWidget.entitlements
     sources:
@@ -62,3 +59,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.camcontrol.app.widget
+        INFOPLIST_FILE: AceProRecorderWidget/Info.plist
