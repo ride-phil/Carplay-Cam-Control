@@ -64,6 +64,13 @@ workflows:
             -archivePath build/AceProRecorder.xcarchive \
             -allowProvisioningUpdates
 
+      - name: Debug compiled Info.plist contents
+        script: |
+          echo "--- App Info.plist ---"
+          plutil -p build/AceProRecorder.xcarchive/Products/Applications/AceProRecorder.app/Info.plist
+          echo "--- Widget Info.plist ---"
+          plutil -p build/AceProRecorder.xcarchive/Products/Applications/AceProRecorder.app/PlugIns/AceProRecorderWidget.appex/Info.plist
+
       - name: Export IPA
         script: |
           xcodebuild -exportArchive \
