@@ -95,8 +95,8 @@ struct WidgetView: View {
     }
 }
 
-struct AceProRecorderWidget: Widget {
-    let kind = "AceProRecorderWidget"
+struct CamControlWidget: Widget {
+    let kind = "CamControlWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in

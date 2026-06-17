@@ -1,4 +1,4 @@
-# Carplay-Cam-Control (AceProRecorder)
+# Carplay-Cam-Control (CamControl)
 
 iOS app + Home Screen/CarPlay widget for controlling an action camera over Bluetooth LE — built for motorcycle use (CarPlay-connected dash, e.g. Chigee units). Pair a camera in the app, then start/stop recording and take photos from the app or the widget without unlocking your phone.
 
@@ -12,12 +12,12 @@ iOS app + Home Screen/CarPlay widget for controlling an action camera over Bluet
 ## Architecture
 
 ```
-AceProRecorder/            Main app — SwiftUI, BLE pairing UI, camera controls
+CamControl/                Main app — SwiftUI, BLE pairing UI, camera controls
   Services/PairingManager.swift   Owns CBCentralManager, drives pairing + recording
   Views/PairingView.swift         Pair/scan UI + Record/Stop/Photo buttons
 
-AceProRecorderWidget/      WidgetKit extension (Home Screen / CarPlay widget)
-  AceProRecorderWidget.swift      Widget UI + TimelineProvider
+CamControlWidget/          WidgetKit extension (Home Screen / CarPlay widget)
+  CamControlWidget.swift          Widget UI + TimelineProvider
   Intents/                        AppIntents for Record/Stop/Photo (run widget-side)
 
 Shared/                    Code shared between app and widget targets
@@ -42,8 +42,8 @@ This caused two real, hard-to-diagnose bugs during initial setup:
 ```yaml
 settings:
   base:
-    INFOPLIST_FILE: AceProRecorder/Info.plist
-    CODE_SIGN_ENTITLEMENTS: AceProRecorder/AceProRecorder.entitlements
+    INFOPLIST_FILE: CamControl/Info.plist
+    CODE_SIGN_ENTITLEMENTS: CamControl/CamControl.entitlements
 ```
 and set `GENERATE_INFOPLIST_FILE: "NO"` once at the project level. Verify by checking a CI build's "Build and archive" log for the `ProcessProductPackaging` / `Entitlements:` dump — it should show your actual custom keys, not just the bare minimum Apple auto-injects.
 
@@ -76,4 +76,4 @@ Requires an `app_store_connect` environment variable group (set in Codemagic app
 - [ ] Find correct BLE opcode for "take photo while recording video" (Insta360 Ace Pro)
 - [ ] Verify widget actually appears in CarPlay's widget gallery on a real unit
 - [ ] GoPro and DJI camera drivers are scaffolded but unverified against real hardware
-- [ ] Placeholder app icon (`AceProRecorder/Assets.xcassets/AppIcon.appiconset/icon-1024.png`) needs real branding before any public release
+- [ ] Placeholder app icon (`CamControl/Assets.xcassets/AppIcon.appiconset/icon-1024.png`) needs real branding before any public release

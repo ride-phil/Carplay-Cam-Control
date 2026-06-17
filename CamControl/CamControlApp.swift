@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct AceProRecorderApp: App {
+struct CamControlApp: App {
     var body: some Scene {
         WindowGroup {
             PairingView()
