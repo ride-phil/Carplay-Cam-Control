@@ -51,8 +51,7 @@ workflows:
 
       - name: Set build number
         script: |
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_APPLE_ID" 2>/dev/null || echo "0")
-          agvtool new-version -all $((LATEST + 1))
+          agvtool new-version -all "$BUILD_NUMBER"
 
       - name: Build and archive
         script: |
