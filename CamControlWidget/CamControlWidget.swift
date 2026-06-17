@@ -7,11 +7,12 @@ struct CameraEntry: TimelineEntry {
     let isPaired: Bool
     let isRecording: Bool
     let cameraName: String
+    let otherCameraCount: Int
 }
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> CameraEntry {
-        CameraEntry(date: .now, isPaired: true, isRecording: false, cameraName: "Ace Pro")
+        CameraEntry(date: .now, isPaired: true, isRecording: false, cameraName: "Camera", otherCameraCount: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CameraEntry) -> Void) {
@@ -22,12 +23,17 @@ struct Provider: TimelineProvider {
         completion(Timeline(entries: [entry()], policy: .never))
     }
 
+    // TODO(Stage B): this widget is being made configurable to a specific
+    // paired camera. Until then it controls the first paired camera only.
     private func entry() -> CameraEntry {
-        CameraEntry(
+        let cameras = SharedState.pairedCameras
+        let primary = cameras.first
+        return CameraEntry(
             date: .now,
-            isPaired: SharedState.pairedPeripheralUUID != nil,
-            isRecording: SharedState.isRecording,
-            cameraName: SharedState.pairedCameraType?.displayName ?? "Camera"
+            isPaired: primary != nil,
+            isRecording: primary.map { SharedState.isRecording($0.id) } ?? false,
+            cameraName: primary?.name ?? "Camera",
+            otherCameraCount: max(cameras.count - 1, 0)
         )
     }
 }
@@ -47,12 +53,17 @@ struct WidgetView: View {
         VStack(spacing: 10) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(entry.isRecording ? .red : .gray)
+                    .fill(entry.isRecording ? .red : .green)
                     .frame(width: 8, height: 8)
                 Text(entry.isRecording ? "REC" : "Ready")
                     .font(.caption2.bold())
-                    .foregroundStyle(entry.isRecording ? .red : .secondary)
+                    .foregroundStyle(entry.isRecording ? .red : .green)
             }
+
+            Text(entry.otherCameraCount > 0 ? "\(entry.cameraName) +\(entry.otherCameraCount)" : entry.cameraName)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
 
             Button(intent: StartRecordingIntent()) {
                 Label("Record", systemImage: "record.circle.fill")

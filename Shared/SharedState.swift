@@ -5,29 +5,36 @@ struct SharedState {
     private static var defaults: UserDefaults { UserDefaults(suiteName: suite)! }
 
     private enum Keys {
-        static let peripheralUUID = "pairedPeripheralUUID"
-        static let cameraType     = "pairedCameraType"
-        static let isRecording    = "isRecording"
+        static let pairedCameras  = "pairedCameras"
+        static let recordingUUIDs = "recordingCameraUUIDs"
     }
 
-    static var pairedPeripheralUUID: UUID? {
+    static var pairedCameras: [PairedCamera] {
         get {
-            guard let str = defaults.string(forKey: Keys.peripheralUUID) else { return nil }
-            return UUID(uuidString: str)
+            guard let data = defaults.data(forKey: Keys.pairedCameras),
+                  let cameras = try? JSONDecoder().decode([PairedCamera].self, from: data) else {
+                return []
+            }
+            return cameras
         }
-        set { defaults.set(newValue?.uuidString, forKey: Keys.peripheralUUID) }
+        set {
+            let data = try? JSONEncoder().encode(newValue)
+            defaults.set(data, forKey: Keys.pairedCameras)
+        }
     }
 
-    static var pairedCameraType: CameraType? {
-        get {
-            guard let raw = defaults.string(forKey: Keys.cameraType) else { return nil }
-            return CameraType(rawValue: raw)
-        }
-        set { defaults.set(newValue?.rawValue, forKey: Keys.cameraType) }
+    static var recordingCameraUUIDs: Set<UUID> {
+        get { Set((defaults.stringArray(forKey: Keys.recordingUUIDs) ?? []).compactMap(UUID.init)) }
+        set { defaults.set(newValue.map(\.uuidString), forKey: Keys.recordingUUIDs) }
     }
 
-    static var isRecording: Bool {
-        get { defaults.bool(forKey: Keys.isRecording) }
-        set { defaults.set(newValue, forKey: Keys.isRecording) }
+    static func isRecording(_ id: UUID) -> Bool {
+        recordingCameraUUIDs.contains(id)
+    }
+
+    static func setRecording(_ id: UUID, _ recording: Bool) {
+        var uuids = recordingCameraUUIDs
+        if recording { uuids.insert(id) } else { uuids.remove(id) }
+        recordingCameraUUIDs = uuids
     }
 }

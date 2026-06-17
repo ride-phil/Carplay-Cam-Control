@@ -2,20 +2,18 @@ import Foundation
 import CoreBluetooth
 import WidgetKit
 
-struct PairedCamera {
-    let uuid: UUID
-    let type: CameraType
-}
-
 @MainActor
 final class PairingManager: NSObject, ObservableObject {
     @Published var discoveredPeripherals: [CBPeripheral] = []
-    @Published var pairedCamera: PairedCamera?
+    @Published var pairedCameras: [PairedCamera] = []
+    @Published var recordingUUIDs: Set<UUID> = []
     @Published var isScanning = false
     @Published var isPairing = false
-    @Published var isRecording = SharedState.isRecording
     @Published var isSendingCommand = false
     @Published var errorMessage: String?
+    /// Raw bytes from the camera's last BLE response after a photo command —
+    /// diagnostic only, for investigating mode-dependent behavior (e.g. Ace Pro).
+    @Published var lastDebugResponse: String?
 
     private var central: CBCentralManager!
     private var pairingTarget: CBPeripheral?
@@ -23,9 +21,8 @@ final class PairingManager: NSObject, ObservableObject {
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: .main)
-        if let uuid = SharedState.pairedPeripheralUUID, let type = SharedState.pairedCameraType {
-            pairedCamera = PairedCamera(uuid: uuid, type: type)
-        }
+        pairedCameras = SharedState.pairedCameras
+        recordingUUIDs = SharedState.recordingCameraUUIDs
     }
 
     func startScanning() {
@@ -52,55 +49,108 @@ final class PairingManager: NSObject, ObservableObject {
         central.connect(peripheral)
     }
 
-    func unpair() {
-        SharedState.pairedPeripheralUUID = nil
-        SharedState.pairedCameraType = nil
-        pairedCamera = nil
-        if let p = pairingTarget { central.cancelPeripheralConnection(p) }
+    func unpair(_ camera: PairedCamera) {
+        pairedCameras.removeAll { $0.id == camera.id }
+        SharedState.pairedCameras = pairedCameras
+        recordingUUIDs.remove(camera.id)
+        SharedState.setRecording(camera.id, false)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    func startRecording() async {
-        await runCommand { driver in try await driver.startRecording() }
-        if errorMessage == nil {
-            isRecording = true
-            SharedState.isRecording = true
-            WidgetCenter.shared.reloadAllTimelines()
+    func startRecording(_ camera: PairedCamera) async {
+        await runCommand(camera) { driver in try await driver.startRecording() }
+        if errorMessage == nil { setRecording(camera.id, true) }
+    }
+
+    func stopRecording(_ camera: PairedCamera) async {
+        await runCommand(camera) { driver in try await driver.stopRecording() }
+        if errorMessage == nil { setRecording(camera.id, false) }
+    }
+
+    func takePhoto(_ camera: PairedCamera) async {
+        await runCommand(camera) { driver in try await driver.takePhoto() }
+        if camera.type == .insta360 {
+            lastDebugResponse = Insta360Driver.lastNotifyHex
         }
     }
 
-    func stopRecording() async {
-        await runCommand { driver in try await driver.stopRecording() }
-        if errorMessage == nil {
-            isRecording = false
-            SharedState.isRecording = false
-            WidgetCenter.shared.reloadAllTimelines()
-        }
+    func startRecordingAll() async {
+        await runCommandAll({ driver in try await driver.startRecording() },
+                             onSuccess: { [weak self] id in self?.setRecording(id, true) })
     }
 
-    func takePhoto() async {
-        await runCommand { driver in try await driver.takePhoto() }
+    func stopRecordingAll() async {
+        await runCommandAll({ driver in try await driver.stopRecording() },
+                             onSuccess: { [weak self] id in self?.setRecording(id, false) })
     }
 
-    private func runCommand(_ action: @escaping (CameraDriver) async throws -> Void) async {
-        guard let camera = pairedCamera else { return }
+    func takePhotoAll() async {
+        await runCommandAll({ driver in try await driver.takePhoto() }, onSuccess: { _ in })
+    }
+
+    private func setRecording(_ id: UUID, _ recording: Bool) {
+        SharedState.setRecording(id, recording)
+        if recording { recordingUUIDs.insert(id) } else { recordingUUIDs.remove(id) }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func runCommand(_ camera: PairedCamera, _ action: @escaping (CameraDriver) async throws -> Void) async {
         isSendingCommand = true
         errorMessage = nil
         let driver = CameraDriverFactory.make(for: camera.type)
         do {
-            try await driver.connect(peripheralID: camera.uuid)
+            try await driver.connect(peripheralID: camera.id)
             try await action(driver)
             driver.disconnect()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "\(camera.name): \(error.localizedDescription)"
         }
+        isSendingCommand = false
+    }
+
+    /// Runs `action` against every paired camera concurrently and reports any
+    /// per-camera failures together rather than failing the whole batch.
+    private func runCommandAll(
+        _ action: @escaping (CameraDriver) async throws -> Void,
+        onSuccess: @escaping (UUID) -> Void
+    ) async {
+        let cameras = pairedCameras
+        guard !cameras.isEmpty else { return }
+        isSendingCommand = true
+        errorMessage = nil
+
+        var failures: [String] = []
+        await withTaskGroup(of: (PairedCamera, Error?).self) { group in
+            for camera in cameras {
+                group.addTask {
+                    let driver = CameraDriverFactory.make(for: camera.type)
+                    do {
+                        try await driver.connect(peripheralID: camera.id)
+                        try await action(driver)
+                        driver.disconnect()
+                        return (camera, nil)
+                    } catch {
+                        return (camera, error)
+                    }
+                }
+            }
+            for await (camera, error) in group {
+                if let error {
+                    failures.append("\(camera.name): \(error.localizedDescription)")
+                } else {
+                    onSuccess(camera.id)
+                }
+            }
+        }
+
+        errorMessage = failures.isEmpty ? nil : failures.joined(separator: "\n")
         isSendingCommand = false
     }
 
     private func cameraType(for peripheral: CBPeripheral) -> CameraType? {
         // Type is inferred from which service we discover during pairing
         if peripheral.services?.contains(where: { $0.uuid == BLEConstants.Insta360.serviceUUID }) == true {
-            return .insta360AcePro
+            return .insta360
         }
         if peripheral.services?.contains(where: { $0.uuid == BLEConstants.GoPro.serviceUUID }) == true {
             return .goPro
@@ -161,9 +211,11 @@ extension PairingManager: CBPeripheralDelegate {
             guard let type = cameraType(for: peripheral) else {
                 isPairing = false; errorMessage = "Unrecognised camera type"; return
             }
-            SharedState.pairedPeripheralUUID = peripheral.identifier
-            SharedState.pairedCameraType = type
-            pairedCamera = PairedCamera(uuid: peripheral.identifier, type: type)
+            let camera = PairedCamera(id: peripheral.identifier, type: type, name: peripheral.name ?? type.displayName)
+            if !pairedCameras.contains(where: { $0.id == camera.id }) {
+                pairedCameras.append(camera)
+                SharedState.pairedCameras = pairedCameras
+            }
             isPairing = false
             central.cancelPeripheralConnection(peripheral)
             WidgetCenter.shared.reloadAllTimelines()

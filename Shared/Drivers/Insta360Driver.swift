@@ -1,8 +1,15 @@
 import Foundation
 import CoreBluetooth
+import os
 
-final class Insta360AceProDriver: NSObject, CameraDriver {
+final class Insta360Driver: NSObject, CameraDriver {
     private static let bleQueue = DispatchQueue(label: "io.camcontrol.app.ble.insta360")
+    private static let log = Logger(subsystem: "io.camcontrol.app", category: "Insta360BLE")
+
+    /// Raw bytes from the camera's last notify response, captured for protocol
+    /// debugging (e.g. the Ace Pro photo-mode investigation) — not yet parsed
+    /// or used for control logic, since the response format is undocumented.
+    static private(set) var lastNotifyHex: String?
 
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
@@ -45,7 +52,12 @@ final class Insta360AceProDriver: NSObject, CameraDriver {
     }
 
     func takePhoto() async throws {
+        Self.lastNotifyHex = nil
         try await send(CommandPacket.insta360(.takePhoto))
+        // Diagnostic: give the camera a moment to reply on the notify
+        // characteristic before the caller disconnects, so lastNotifyHex
+        // has a chance to capture its response.
+        try? await Task.sleep(nanoseconds: 600_000_000)
     }
 
     func disconnect() {
@@ -61,7 +73,7 @@ final class Insta360AceProDriver: NSObject, CameraDriver {
     }
 }
 
-extension Insta360AceProDriver: CBCentralManagerDelegate {
+extension Insta360Driver: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         switch central.state {
         case .poweredOn:
@@ -82,7 +94,7 @@ extension Insta360AceProDriver: CBCentralManagerDelegate {
     }
 }
 
-extension Insta360AceProDriver: CBPeripheralDelegate {
+extension Insta360Driver: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         if let error { connectContinuation?.resume(throwing: error); connectContinuation = nil; return }
         guard let svc = peripheral.services?.first(where: { $0.uuid == BLEConstants.Insta360.serviceUUID }) else {
@@ -107,10 +119,23 @@ extension Insta360AceProDriver: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
         if let error {
+            Self.log.error("write ack failed: \(error.localizedDescription, privacy: .public)")
             commandContinuation?.resume(throwing: error)
         } else {
+            Self.log.debug("write ack: ok")
             commandContinuation?.resume()
         }
         commandContinuation = nil
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error {
+            Self.log.error("notify error: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        guard let data = characteristic.value else { return }
+        let hex = data.map { String(format: "%02x", $0) }.joined(separator: " ")
+        Self.lastNotifyHex = hex
+        Self.log.debug("notify <- \(hex, privacy: .public)")
     }
 }

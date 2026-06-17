@@ -4,10 +4,11 @@ iOS app + Home Screen/CarPlay widget for controlling an action camera over Bluet
 
 ## Status
 
-- **App**: builds, signs, installs via TestFlight. Pairing, Start/Stop recording confirmed working on an Insta360 Ace Pro.
+- **App**: builds, signs, installs via TestFlight. Pairing, Start/Stop recording confirmed working on an Insta360 Ace Pro and an Insta360 X4 — both expose the same BLE service/protocol, handled by one `Insta360Driver`.
+- **Multi-camera**: the app can pair and control more than one camera at once (per-camera Record/Stop/Photo, plus a "Record All / Stop All / Photo — All Cameras" batch control that runs concurrently across all paired cameras). The Home Screen/CarPlay widget still controls only the first paired camera — making it per-camera-configurable, plus a separate "Record All" widget, is tracked below.
 - **Widget**: confirmed working — shows live paired/recording state, Record/Stop/Photo buttons trigger real camera commands via `AppIntents`.
 - **CarPlay**: not yet verified. The widget already meets Apple's requirement for automatic CarPlay Dashboard inclusion (`.supportedFamilies([.systemSmall])`), so it *should* show up under CarPlay's widget gallery once added to the iPhone Home Screen — untested on an actual unit.
-- **Photo capture**: works in the camera's photo mode. Does **not** work while the camera is recording video — the BLE opcode used (`0x03`) is likely a generic "shutter" trigger that's mode-dependent, not a dedicated "snapshot" command. Needs a real packet capture from the official Insta360 app to find the correct command; not something fixable by guessing.
+- **Photo capture**: works on the X4 directly. On the Ace Pro, the camera must be manually switched to Photo mode first — the BLE opcode used (`0x03`) was never sourced from real protocol documentation (it was a scaffolding-time guess), and is likely a generic "shutter" trigger that's mode-dependent rather than a dedicated "snapshot" command. Also does **not** work on either camera while recording video, for the same reason. `Insta360Driver` now logs (`os.log`, category `Insta360BLE`) and surfaces in the app UI ("Debug — Last Camera Response") the raw bytes the camera sends back after a photo command, to gather real protocol data instead of guessing at new opcodes — needs testing against both cameras in both modes.
 
 ## Architecture
 
@@ -21,8 +22,9 @@ CamControlWidget/          WidgetKit extension (Home Screen / CarPlay widget)
   Intents/                        AppIntents for Record/Stop/Photo (run widget-side)
 
 Shared/                    Code shared between app and widget targets
-  SharedState.swift               App Group-backed UserDefaults (pairing/recording state)
-  CameraDriver*.swift             Per-camera-brand BLE command protocol (Insta360 implemented; GoPro/DJI scaffolded, unverified)
+  PairedCamera.swift              One paired camera (peripheral UUID, type, real BLE device name)
+  SharedState.swift               App Group-backed UserDefaults — list of paired cameras + per-camera recording state
+  CameraDriver*.swift             Per-protocol-family BLE command driver (Insta360 implemented and covers multiple Insta360 models; GoPro/DJI scaffolded, unverified)
 ```
 
 ### Data flow
@@ -73,7 +75,8 @@ Requires an `app_store_connect` environment variable group (set in Codemagic app
 
 ## Known open items
 
-- [ ] Find correct BLE opcode for "take photo while recording video" (Insta360 Ace Pro)
+- [ ] Find the correct Insta360 BLE photo-capture opcode/sequence — `0x03` requires the Ace Pro to already be in Photo mode and doesn't work on either camera while recording. Debug logging is in place (`Insta360Driver.lastNotifyHex`, shown in-app); needs a test pass against both cameras in both modes to capture real response bytes
 - [ ] Verify widget actually appears in CarPlay's widget gallery on a real unit
 - [ ] GoPro and DJI camera drivers are scaffolded but unverified against real hardware
 - [ ] Placeholder app icon (`CamControl/Assets.xcassets/AppIcon.appiconset/icon-1024.png`) needs real branding before any public release
+- [ ] Make the per-camera widget configurable (`AppIntentConfiguration` + `CameraEntity`/`EntityQuery`) so each placed instance targets a specific paired camera, and add a separate, non-configurable "Record All" widget that fans out to every paired camera — until then the existing widget only controls the first paired camera
