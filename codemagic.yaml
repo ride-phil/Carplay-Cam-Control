@@ -49,6 +49,13 @@ workflows:
       - name: Generate Xcode project
         script: xcodegen generate
 
+      - name: Debug build settings after xcodegen
+        script: |
+          echo "--- App target INFOPLIST settings (post xcodegen) ---"
+          xcodebuild -showBuildSettings -project AceProRecorder.xcodeproj -scheme "$XCODE_SCHEME" 2>/dev/null | grep -i infoplist
+          echo "--- pbxproj GENERATE_INFOPLIST_FILE occurrences ---"
+          grep -n "GENERATE_INFOPLIST_FILE\|INFOPLIST_FILE" AceProRecorder.xcodeproj/project.pbxproj
+
       - name: Set build number
         script: |
           LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_APPLE_ID" 2>/dev/null || echo "0")
@@ -57,6 +64,8 @@ workflows:
       - name: Build and archive
         script: |
           xcode-project use-profiles
+          echo "--- pbxproj GENERATE_INFOPLIST_FILE occurrences (post use-profiles) ---"
+          grep -n "GENERATE_INFOPLIST_FILE\|INFOPLIST_FILE" AceProRecorder.xcodeproj/project.pbxproj
           xcodebuild archive \
             -project AceProRecorder.xcodeproj \
             -scheme "$XCODE_SCHEME" \
