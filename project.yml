@@ -9,8 +9,11 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    DEVELOPMENT_TEAM: ""        # Fill in your Apple Team ID
+    DEVELOPMENT_TEAM: "8DBK4N5HFL"
     DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+    VERSIONING_SYSTEM: apple-generic
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.0"
 
 targets:
   AceProRecorder:
