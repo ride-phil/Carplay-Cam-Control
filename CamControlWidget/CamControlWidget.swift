@@ -21,11 +21,11 @@ struct Provider: AppIntentTimelineProvider {
     }
 
     func timeline(for configuration: SelectCameraIntent, in context: Context) async -> Timeline<CameraEntry> {
-        // Self-corrects on a 20s cadence on top of the explicit reloadAllTimelines()
+        // Self-corrects on an 8s cadence on top of the explicit reloadAllTimelines()
         // calls every intent makes — WidgetCenter reloads triggered from another
         // widget/the app are subject to iOS's own refresh budget and aren't
         // guaranteed to land promptly, so this is a bounded-time backstop.
-        Timeline(entries: [entry(for: configuration)], policy: .after(.now.addingTimeInterval(20)))
+        Timeline(entries: [entry(for: configuration)], policy: .after(.now.addingTimeInterval(8)))
     }
 
     private func entry(for configuration: SelectCameraIntent) -> CameraEntry {
