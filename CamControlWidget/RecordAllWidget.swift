@@ -59,6 +59,12 @@ struct AllCamerasWidgetView: View {
                     .foregroundStyle(statusColor)
             }
 
+            // Diagnostic: self-updating, no extra refresh cost — reveals
+            // whether stale status is a real data bug or just a display lag.
+            Text(entry.date, style: .relative)
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
+
             WidgetActionButton(title: "Record All", icon: "record.circle.fill", color: .red, intent: RecordAllIntent())
             WidgetActionButton(title: "Stop All", icon: "stop.circle.fill", color: .primary, intent: StopAllIntent())
             WidgetActionButton(title: "Photo All", icon: "camera.circle.fill", color: .blue, intent: PhotoAllIntent())

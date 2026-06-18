@@ -79,6 +79,12 @@ struct WidgetView: View {
                     .foregroundStyle(statusColor)
             }
 
+            // Diagnostic: self-updating, no extra refresh cost — reveals
+            // whether stale status is a real data bug or just a display lag.
+            Text(entry.date, style: .relative)
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
+
             WidgetActionButton(title: "Record", icon: "record.circle.fill", color: .red,
                                 intent: StartRecordingIntent(camera: camera), isDisabled: entry.isRecording)
 
