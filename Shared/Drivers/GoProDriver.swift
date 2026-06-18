@@ -5,7 +5,9 @@ import CoreBluetooth
 // Hero9 Black and later, but the underlying BLE command set is the same one used since
 // Hero5 Black; confirmed working here on a Hero7 Silver. Uses service FEA6.
 final class GoProDriver: NSObject, CameraDriver {
-    private static let bleQueue = DispatchQueue(label: "io.camcontrol.app.ble.gopro")
+    // Per-instance, not static — see Insta360Driver for why (avoids
+    // serializing multiple concurrently-commanded cameras of the same type).
+    private let bleQueue = DispatchQueue(label: "io.camcontrol.app.ble.gopro")
 
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
@@ -17,7 +19,7 @@ final class GoProDriver: NSObject, CameraDriver {
 
     override init() {
         super.init()
-        central = CBCentralManager(delegate: self, queue: Self.bleQueue)
+        central = CBCentralManager(delegate: self, queue: bleQueue)
     }
 
     func connect(peripheralID: UUID) async throws {

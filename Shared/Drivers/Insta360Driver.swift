@@ -3,7 +3,11 @@ import CoreBluetooth
 import os
 
 final class Insta360Driver: NSObject, CameraDriver {
-    private static let bleQueue = DispatchQueue(label: "io.camcontrol.app.ble.insta360")
+    // Per-instance, not static — a shared queue would serialize multiple
+    // concurrently-commanded Insta360 cameras (e.g. via Record All) behind
+    // each other, delaying their actual BLE completion relative to other
+    // camera types that aren't sharing a queue.
+    private let bleQueue = DispatchQueue(label: "io.camcontrol.app.ble.insta360")
     private static let log = Logger(subsystem: "io.camcontrol.app", category: "Insta360BLE")
 
     /// Raw bytes from the camera's last notify response, captured for protocol
@@ -21,7 +25,7 @@ final class Insta360Driver: NSObject, CameraDriver {
 
     override init() {
         super.init()
-        central = CBCentralManager(delegate: self, queue: Self.bleQueue)
+        central = CBCentralManager(delegate: self, queue: bleQueue)
     }
 
     func connect(peripheralID: UUID) async throws {
