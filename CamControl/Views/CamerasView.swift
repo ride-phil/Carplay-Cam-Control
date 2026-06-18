@@ -1,13 +1,14 @@
 import SwiftUI
-import CoreBluetooth
 
-struct PairingView: View {
-    @StateObject private var manager = PairingManager()
+struct CamerasView: View {
+    @ObservedObject var manager: PairingManager
 
     var body: some View {
         NavigationStack {
             List {
-                if !manager.pairedCameras.isEmpty {
+                if manager.pairedCameras.isEmpty {
+                    emptyState
+                } else {
                     Section("All Cameras") {
                         allCamerasRow
                     }
@@ -15,32 +16,6 @@ struct PairingView: View {
                     Section("Paired") {
                         ForEach(manager.pairedCameras) { camera in
                             pairedCameraRow(camera)
-                        }
-                    }
-                }
-
-                if manager.isScanning || manager.isPairing {
-                    Section {
-                        HStack(spacing: 12) {
-                            ProgressView()
-                            Text(manager.isPairing ? "Pairing…" : "Scanning for cameras…")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                if !manager.discoveredPeripherals.isEmpty {
-                    Section("Found") {
-                        ForEach(manager.discoveredPeripherals, id: \.identifier) { peripheral in
-                            Button {
-                                manager.pair(peripheral)
-                            } label: {
-                                HStack {
-                                    Image(systemName: "camera.circle")
-                                    Text(peripheral.name ?? peripheral.identifier.uuidString)
-                                }
-                            }
-                            .disabled(manager.isPairing)
                         }
                     }
                 }
@@ -59,23 +34,27 @@ struct PairingView: View {
                             .textSelection(.enabled)
                     }
                 }
+            }
+            .navigationTitle("Cameras")
+        }
+    }
 
-                if manager.pairedCameras.isEmpty && !manager.isScanning && manager.discoveredPeripherals.isEmpty && manager.errorMessage == nil {
-                    Section {
-                        Text("Tap Scan to find nearby cameras.\nMake sure the camera is powered on.")
-                            .foregroundStyle(.secondary)
-                            .font(.callout)
-                    }
-                }
+    private var emptyState: some View {
+        Section {
+            VStack(spacing: 12) {
+                Image(systemName: "camera.badge.ellipsis")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary)
+                Text("No cameras paired yet")
+                    .font(.headline)
+                Text("Go to the Connect tab to scan for nearby cameras.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .navigationTitle("Camera Control")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(manager.isScanning ? "Stop" : "Scan") {
-                        manager.isScanning ? manager.stopScanning() : manager.startScanning()
-                    }
-                }
-            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+            .listRowBackground(Color.clear)
         }
     }
 

@@ -4,7 +4,7 @@ import SwiftUI
 struct CamControlApp: App {
     var body: some Scene {
         WindowGroup {
-            PairingView()
+            RootView()
         }
     }
 }

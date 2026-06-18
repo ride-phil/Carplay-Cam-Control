@@ -1,8 +1,9 @@
 import Foundation
 import CoreBluetooth
 
-// GoPro Open API BLE — https://gopro.github.io/OpenGoPro/ble_2_0
-// Works with Hero 9 Black and later. Uses service FEA6, TLV command packets.
+// Open GoPro BLE API — https://github.com/gopro/OpenGoPro. Officially documented for
+// Hero9 Black and later, but the underlying BLE command set is the same one used since
+// Hero5 Black; confirmed working here on a Hero7 Silver. Uses service FEA6.
 final class GoProDriver: NSObject, CameraDriver {
     private static let bleQueue = DispatchQueue(label: "io.camcontrol.app.ble.gopro")
 
@@ -33,9 +34,23 @@ final class GoProDriver: NSObject, CameraDriver {
         }
     }
 
-    func startRecording() async throws { try await send(BLEConstants.GoPro.startVideo) }
-    func stopRecording() async throws  { try await send(BLEConstants.GoPro.stopVideo) }
-    func takePhoto() async throws      { try await send(BLEConstants.GoPro.takePhoto) }
+    func startRecording() async throws {
+        // Shutter ON is a dumb toggle — force Video preset first so it doesn't take a photo
+        // if the camera happens to be in Photo mode.
+        try await send(BLEConstants.GoPro.loadVideoPresetGroup)
+        try await send(BLEConstants.GoPro.shutterOn)
+    }
+
+    func stopRecording() async throws {
+        try await send(BLEConstants.GoPro.shutterOff)
+    }
+
+    func takePhoto() async throws {
+        // Same shutter toggle as startRecording — force Photo preset first so it takes a
+        // photo instead of starting a video recording.
+        try await send(BLEConstants.GoPro.loadPhotoPresetGroup)
+        try await send(BLEConstants.GoPro.shutterOn)
+    }
 
     func disconnect() {
         if let p = peripheral { central.cancelPeripheralConnection(p) }

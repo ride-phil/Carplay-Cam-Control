@@ -24,8 +24,13 @@
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Cam Control uses Bluetooth to pair and control your action camera.</string>
+    <key>UIUserInterfaceStyle</key>
+    <string>Dark</string>
     <key>UILaunchScreen</key>
-    <dict/>
+    <dict>
+        <key>UIColorName</key>
+        <string>LaunchBackground</string>
+    </dict>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
