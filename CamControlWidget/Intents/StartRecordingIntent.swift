@@ -21,10 +21,19 @@ struct StartRecordingIntent: AppIntent {
             throw CameraError.peripheralNotFound
         }
         let driver = CameraDriverFactory.make(for: paired.type)
-        try await driver.connect(peripheralID: paired.peripheralID)
-        try await driver.startRecording()
-        driver.disconnect()
-        SharedState.setRecording(paired.id, true)
+        do {
+            try await driver.connect(peripheralID: paired.peripheralID)
+            try await driver.startRecording()
+            driver.disconnect()
+            SharedState.setRecording(paired.id, true)
+            SharedState.setUnreachable(paired.id, false)
+        } catch {
+            if case CameraError.peripheralNotFound = error {
+                SharedState.setUnreachable(paired.id, true)
+            }
+            WidgetCenter.shared.reloadAllTimelines()
+            throw error
+        }
         WidgetCenter.shared.reloadAllTimelines()
         return .result()
     }

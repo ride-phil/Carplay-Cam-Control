@@ -13,6 +13,10 @@ final class PairingManager: NSObject, ObservableObject {
     @Published var errorMessage: String?
     /// Stable id of the paired camera currently being re-scanned for, if any.
     @Published var reconnectingCameraID: UUID?
+    /// Cameras confirmed unreachable (peripheral not found) by a failed
+    /// command or reconnect attempt. In-memory only — reflects current
+    /// connectivity, not a stored property of the pairing itself.
+    @Published var unreachableCameraIDs: Set<UUID> = []
     /// Raw bytes from the camera's last BLE response after a photo command —
     /// diagnostic only, for investigating mode-dependent behavior (e.g. Ace Pro).
     @Published var lastDebugResponse: String?
@@ -26,6 +30,7 @@ final class PairingManager: NSObject, ObservableObject {
         central = CBCentralManager(delegate: self, queue: .main)
         pairedCameras = SharedState.pairedCameras
         recordingUUIDs = SharedState.recordingCameraUUIDs
+        unreachableCameraIDs = SharedState.unreachableCameraUUIDs
     }
 
     func startScanning() {
@@ -80,6 +85,7 @@ final class PairingManager: NSObject, ObservableObject {
                 self.stopScanning()
                 self.reconnectingCameraID = nil
                 self.errorMessage = "\(camera.name): not found — make sure it's powered on and nearby"
+                self.setUnreachable(camera.id, true)
             }
         }
     }
@@ -89,6 +95,8 @@ final class PairingManager: NSObject, ObservableObject {
         SharedState.pairedCameras = pairedCameras
         recordingUUIDs.remove(camera.id)
         SharedState.setRecording(camera.id, false)
+        unreachableCameraIDs.remove(camera.id)
+        SharedState.setUnreachable(camera.id, false)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
@@ -129,6 +137,12 @@ final class PairingManager: NSObject, ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
+    private func setUnreachable(_ id: UUID, _ unreachable: Bool) {
+        SharedState.setUnreachable(id, unreachable)
+        if unreachable { unreachableCameraIDs.insert(id) } else { unreachableCameraIDs.remove(id) }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
     private func runCommand(_ camera: PairedCamera, _ action: @escaping (CameraDriver) async throws -> Void) async {
         isSendingCommand = true
         errorMessage = nil
@@ -137,8 +151,12 @@ final class PairingManager: NSObject, ObservableObject {
             try await driver.connect(peripheralID: camera.peripheralID)
             try await action(driver)
             driver.disconnect()
+            setUnreachable(camera.id, false)
         } catch {
             errorMessage = "\(camera.name): \(error.localizedDescription)"
+            if case CameraError.peripheralNotFound = error {
+                setUnreachable(camera.id, true)
+            }
         }
         isSendingCommand = false
     }
@@ -172,8 +190,12 @@ final class PairingManager: NSObject, ObservableObject {
             for await (camera, error) in group {
                 if let error {
                     failures.append("\(camera.name): \(error.localizedDescription)")
+                    if case CameraError.peripheralNotFound = error {
+                        setUnreachable(camera.id, true)
+                    }
                 } else {
                     onSuccess(camera.id)
+                    setUnreachable(camera.id, false)
                 }
             }
         }
@@ -197,7 +219,7 @@ final class PairingManager: NSObject, ObservableObject {
         guard let index = pairedCameras.firstIndex(where: { $0.id == camera.id }) else { return }
         pairedCameras[index].peripheralID = peripheral.identifier
         SharedState.pairedCameras = pairedCameras
-        WidgetCenter.shared.reloadAllTimelines()
+        setUnreachable(camera.id, false)
     }
 }
 
@@ -265,8 +287,10 @@ extension PairingManager: CBPeripheralDelegate {
             let name = peripheral.name ?? type.displayName
             if let index = pairedCameras.firstIndex(where: { $0.peripheralID == peripheral.identifier || $0.name == name }) {
                 // Already paired (or reappearing under a new peripheral identity) — rebind rather than duplicate.
+                let stableID = pairedCameras[index].id
                 pairedCameras[index].peripheralID = peripheral.identifier
                 SharedState.pairedCameras = pairedCameras
+                setUnreachable(stableID, false)
             } else {
                 let camera = PairedCamera(id: UUID(), peripheralID: peripheral.identifier, type: type, name: name)
                 pairedCameras.append(camera)

@@ -6,11 +6,12 @@ struct AllCamerasEntry: TimelineEntry {
     let date: Date
     let totalCount: Int
     let recordingCount: Int
+    let unreachableCount: Int
 }
 
 struct AllCamerasProvider: TimelineProvider {
     func placeholder(in context: Context) -> AllCamerasEntry {
-        AllCamerasEntry(date: .now, totalCount: 1, recordingCount: 0)
+        AllCamerasEntry(date: .now, totalCount: 1, recordingCount: 0, unreachableCount: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (AllCamerasEntry) -> Void) {
@@ -24,7 +25,8 @@ struct AllCamerasProvider: TimelineProvider {
     private func entry() -> AllCamerasEntry {
         let cameras = SharedState.pairedCameras
         let recording = cameras.filter { SharedState.isRecording($0.id) }.count
-        return AllCamerasEntry(date: .now, totalCount: cameras.count, recordingCount: recording)
+        let unreachable = cameras.filter { SharedState.isUnreachable($0.id) }.count
+        return AllCamerasEntry(date: .now, totalCount: cameras.count, recordingCount: recording, unreachableCount: unreachable)
     }
 }
 
@@ -40,14 +42,19 @@ struct AllCamerasWidgetView: View {
     }
 
     private var controlView: some View {
-        VStack(spacing: 10) {
+        let statusColor: Color = entry.recordingCount > 0 ? .red : (entry.unreachableCount > 0 ? .orange : .green)
+        let statusText = entry.recordingCount > 0
+            ? "\(entry.recordingCount)/\(entry.totalCount) REC"
+            : (entry.unreachableCount > 0 ? "\(entry.unreachableCount)/\(entry.totalCount) Unreachable" : "\(entry.totalCount) Ready")
+
+        return VStack(spacing: 10) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(entry.recordingCount > 0 ? .red : .green)
+                    .fill(statusColor)
                     .frame(width: 8, height: 8)
-                Text(entry.recordingCount > 0 ? "\(entry.recordingCount)/\(entry.totalCount) REC" : "\(entry.totalCount) Ready")
+                Text(statusText)
                     .font(.caption2.bold())
-                    .foregroundStyle(entry.recordingCount > 0 ? .red : .green)
+                    .foregroundStyle(statusColor)
             }
 
             Button(intent: RecordAllIntent()) {

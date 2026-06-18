@@ -7,12 +7,13 @@ struct CameraEntry: TimelineEntry {
     let cameraID: UUID?
     let cameraName: String
     let isRecording: Bool
+    let isUnreachable: Bool
     let isConfigured: Bool
 }
 
 struct Provider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> CameraEntry {
-        CameraEntry(date: .now, cameraID: UUID(), cameraName: "Camera", isRecording: false, isConfigured: true)
+        CameraEntry(date: .now, cameraID: UUID(), cameraName: "Camera", isRecording: false, isUnreachable: false, isConfigured: true)
     }
 
     func snapshot(for configuration: SelectCameraIntent, in context: Context) async -> CameraEntry {
@@ -25,16 +26,17 @@ struct Provider: AppIntentTimelineProvider {
 
     private func entry(for configuration: SelectCameraIntent) -> CameraEntry {
         guard let selected = configuration.camera else {
-            return CameraEntry(date: .now, cameraID: nil, cameraName: "", isRecording: false, isConfigured: false)
+            return CameraEntry(date: .now, cameraID: nil, cameraName: "", isRecording: false, isUnreachable: false, isConfigured: false)
         }
         guard let camera = SharedState.pairedCameras.first(where: { $0.id == selected.id }) else {
-            return CameraEntry(date: .now, cameraID: nil, cameraName: selected.name, isRecording: false, isConfigured: true)
+            return CameraEntry(date: .now, cameraID: nil, cameraName: selected.name, isRecording: false, isUnreachable: false, isConfigured: true)
         }
         return CameraEntry(
             date: .now,
             cameraID: camera.id,
             cameraName: camera.name,
             isRecording: SharedState.isRecording(camera.id),
+            isUnreachable: SharedState.isUnreachable(camera.id),
             isConfigured: true
         )
     }
@@ -56,14 +58,17 @@ struct WidgetView: View {
     private func controlView(cameraID: UUID) -> some View {
         let camera = CameraEntity(id: cameraID, name: entry.cameraName)
 
+        let statusColor: Color = entry.isUnreachable ? .orange : (entry.isRecording ? .red : .green)
+        let statusText = entry.isUnreachable ? "Unreachable" : (entry.isRecording ? "REC" : "Ready")
+
         return VStack(spacing: 10) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(entry.isRecording ? .red : .green)
+                    .fill(statusColor)
                     .frame(width: 8, height: 8)
-                Text(entry.isRecording ? "REC" : "Ready")
+                Text(statusText)
                     .font(.caption2.bold())
-                    .foregroundStyle(entry.isRecording ? .red : .green)
+                    .foregroundStyle(statusColor)
             }
 
             Text(entry.cameraName)

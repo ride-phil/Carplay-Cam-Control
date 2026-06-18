@@ -10,7 +10,7 @@ struct StopAllIntent: AppIntent {
         let cameras = SharedState.pairedCameras
         guard !cameras.isEmpty else { throw CameraError.peripheralNotFound }
 
-        await withTaskGroup(of: (UUID, Bool).self) { group in
+        await withTaskGroup(of: (UUID, Error?).self) { group in
             for camera in cameras {
                 group.addTask {
                     let driver = CameraDriverFactory.make(for: camera.type)
@@ -18,15 +18,22 @@ struct StopAllIntent: AppIntent {
                         try await driver.connect(peripheralID: camera.peripheralID)
                         try await driver.stopRecording()
                         driver.disconnect()
-                        return (camera.id, true)
+                        return (camera.id, nil)
                     } catch {
-                        return (camera.id, false)
+                        return (camera.id, error)
                     }
                 }
             }
             // Consumed serially so SharedState writes for different cameras don't race.
-            for await (id, succeeded) in group where succeeded {
-                SharedState.setRecording(id, false)
+            for await (id, error) in group {
+                if let error {
+                    if case CameraError.peripheralNotFound = error {
+                        SharedState.setUnreachable(id, true)
+                    }
+                } else {
+                    SharedState.setRecording(id, false)
+                    SharedState.setUnreachable(id, false)
+                }
             }
         }
 

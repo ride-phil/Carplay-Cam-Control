@@ -80,13 +80,13 @@ struct PairingView: View {
     }
 
     private var allCamerasRow: some View {
+        let total = manager.pairedCameras.count
         let recordingCount = manager.pairedCameras.filter { manager.recordingUUIDs.contains($0.id) }.count
+        let unreachableCount = manager.pairedCameras.filter { manager.unreachableCameraIDs.contains($0.id) }.count
 
         return VStack(alignment: .leading, spacing: 12) {
-            Text(recordingCount > 0
-                 ? "\(recordingCount) of \(manager.pairedCameras.count) recording"
-                 : "\(manager.pairedCameras.count) camera\(manager.pairedCameras.count == 1 ? "" : "s") ready")
-                .foregroundStyle(recordingCount > 0 ? .red : .green)
+            Text(allCamerasSummary(total: total, recording: recordingCount, unreachable: unreachableCount))
+                .foregroundStyle(recordingCount > 0 ? .red : (unreachableCount > 0 ? .orange : .green))
                 .font(.callout)
 
             HStack(spacing: 12) {
@@ -122,19 +122,28 @@ struct PairingView: View {
         .padding(.vertical, 4)
     }
 
+    private func allCamerasSummary(total: Int, recording: Int, unreachable: Int) -> String {
+        if recording > 0 { return "\(recording) of \(total) recording" }
+        if unreachable > 0 { return "\(unreachable) of \(total) unreachable" }
+        return "\(total) camera\(total == 1 ? "" : "s") ready"
+    }
+
     private func pairedCameraRow(_ camera: PairedCamera) -> some View {
         let isRecording = manager.recordingUUIDs.contains(camera.id)
+        let isUnreachable = manager.unreachableCameraIDs.contains(camera.id)
+        let statusColor: Color = isUnreachable ? .orange : (isRecording ? .red : .green)
+        let statusText = isUnreachable ? "Unreachable" : (isRecording ? "Recording" : "Ready")
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "camera.fill")
-                    .foregroundStyle(isRecording ? .red : .green)
+                    .foregroundStyle(statusColor)
                 Text(camera.name)
                     .font(.headline)
                 Spacer()
-                Text(isRecording ? "Recording" : "Ready")
+                Text(statusText)
                     .font(.caption)
-                    .foregroundStyle(isRecording ? .red : .green)
+                    .foregroundStyle(statusColor)
             }
 
             HStack(spacing: 8) {
