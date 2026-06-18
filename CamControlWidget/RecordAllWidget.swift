@@ -65,8 +65,10 @@ struct AllCamerasWidgetView: View {
                 .font(.system(size: 8))
                 .foregroundStyle(.secondary)
 
-            WidgetActionButton(title: "Record All", icon: "record.circle.fill", color: .red, intent: RecordAllIntent())
-            WidgetActionButton(title: "Stop All", icon: "stop.circle.fill", color: .primary, intent: StopAllIntent())
+            WidgetActionButton(title: "Record All", icon: "record.circle.fill", color: .red,
+                                intent: RecordAllIntent(), isDisabled: entry.recordingCount == entry.totalCount)
+            WidgetActionButton(title: "Stop All", icon: "stop.circle.fill", color: .primary,
+                                intent: StopAllIntent(), isDisabled: entry.recordingCount == 0)
             WidgetActionButton(title: "Photo All", icon: "camera.circle.fill", color: .blue, intent: PhotoAllIntent())
         }
         .padding(8)
