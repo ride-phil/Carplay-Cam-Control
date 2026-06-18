@@ -38,9 +38,15 @@ struct AboutView: View {
                         .foregroundStyle(.green)
                     Label("Insta360 Ace Pro — must be in Photo mode to take photos", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
-                    Label("GoPro (Hero 7 and later) — Record/Stop confirmed; Photo fix pending verification", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                    Label("GoPro Hero 7 — Record/Stop reliable; Photo starts a video instead (older camera, not being pursued further)", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
                     Label("DJI — not yet supported", systemImage: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Battery Level") {
+                    Text("GoPro only, for now — shown on each camera's row and in a dedicated Battery widget. Insta360 and DJI show as Unknown.")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 

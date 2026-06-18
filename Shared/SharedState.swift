@@ -8,6 +8,7 @@ struct SharedState {
         static let pairedCameras     = "pairedCameras"
         static let recordingUUIDs    = "recordingCameraUUIDs"
         static let unreachableUUIDs  = "unreachableCameraUUIDs"
+        static let batteryLevels     = "batteryLevelsByCameraUUID"
     }
 
     static var pairedCameras: [PairedCamera] {
@@ -71,5 +72,33 @@ struct SharedState {
         var uuids = unreachableCameraUUIDs
         if unreachable { uuids.insert(id) } else { uuids.remove(id) }
         unreachableCameraUUIDs = uuids
+    }
+
+    /// Battery percentage (0-100) per camera, where known. Only populated for
+    /// camera types whose driver supports querying it (currently GoPro only).
+    static var batteryLevels: [UUID: Int] {
+        get {
+            guard let dict = defaults.dictionary(forKey: Keys.batteryLevels) as? [String: Int] else { return [:] }
+            return Dictionary(uniqueKeysWithValues: dict.compactMap { key, value in
+                UUID(uuidString: key).map { ($0, value) }
+            })
+        }
+        set {
+            let store = defaults
+            let dict = Dictionary(uniqueKeysWithValues: newValue.map { ($0.key.uuidString, $0.value) })
+            store.set(dict, forKey: Keys.batteryLevels)
+            store.synchronize()
+            CrossProcessNotifier.notifyStateChanged()
+        }
+    }
+
+    static func batteryLevel(_ id: UUID) -> Int? {
+        batteryLevels[id]
+    }
+
+    static func setBatteryLevel(_ id: UUID, _ percent: Int?) {
+        var levels = batteryLevels
+        levels[id] = percent
+        batteryLevels = levels
     }
 }

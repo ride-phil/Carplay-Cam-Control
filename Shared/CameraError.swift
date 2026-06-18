@@ -8,6 +8,7 @@ enum CameraError: LocalizedError {
     case characteristicNotFound
     case notConnected
     case writeTimeout
+    case unsupported
 
     var errorDescription: String? {
         switch self {
@@ -18,6 +19,7 @@ enum CameraError: LocalizedError {
         case .characteristicNotFound:   return "Camera BLE characteristic not found"
         case .notConnected:             return "Not connected to camera"
         case .writeTimeout:             return "Command timed out"
+        case .unsupported:              return "Not supported for this camera"
         }
     }
 }

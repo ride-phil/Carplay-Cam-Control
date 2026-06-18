@@ -17,6 +17,9 @@ final class PairingManager: NSObject, ObservableObject {
     /// command or reconnect attempt. In-memory only — reflects current
     /// connectivity, not a stored property of the pairing itself.
     @Published var unreachableCameraIDs: Set<UUID> = []
+    /// Battery percentage per camera, where known — only populated for camera
+    /// types whose driver supports querying it (currently GoPro only).
+    @Published var batteryLevels: [UUID: Int] = [:]
     /// Raw bytes from the camera's last BLE response after a photo command —
     /// diagnostic only, for investigating mode-dependent behavior (e.g. Ace Pro).
     @Published var lastDebugResponse: String?
@@ -46,6 +49,7 @@ final class PairingManager: NSObject, ObservableObject {
         pairedCameras = SharedState.pairedCameras
         recordingUUIDs = SharedState.recordingCameraUUIDs
         unreachableCameraIDs = SharedState.unreachableCameraUUIDs
+        batteryLevels = SharedState.batteryLevels
     }
 
     func startScanning() {
@@ -168,6 +172,12 @@ final class PairingManager: NSObject, ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
+    private func setBattery(_ id: UUID, _ percent: Int) {
+        SharedState.setBatteryLevel(id, percent)
+        batteryLevels[id] = percent
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
     private func runCommand(_ camera: PairedCamera, _ action: @escaping (CameraDriver) async throws -> Void) async {
         isSendingCommand = true
         errorMessage = nil
@@ -175,6 +185,12 @@ final class PairingManager: NSObject, ObservableObject {
         do {
             try await driver.connect(peripheralID: camera.peripheralID)
             try await action(driver)
+            // Opportunistic — piggyback a battery check on the connection we
+            // already have open rather than requiring a dedicated action.
+            // Unsupported camera types just throw and are silently skipped.
+            if let battery = try? await driver.batteryPercentage() {
+                setBattery(camera.id, battery)
+            }
             driver.disconnect()
             setUnreachable(camera.id, false)
         } catch {
@@ -198,21 +214,25 @@ final class PairingManager: NSObject, ObservableObject {
         errorMessage = nil
 
         var failures: [String] = []
-        await withTaskGroup(of: (PairedCamera, Error?).self) { group in
+        await withTaskGroup(of: (PairedCamera, Error?, Int?).self) { group in
             for camera in cameras {
                 group.addTask {
                     let driver = CameraDriverFactory.make(for: camera.type)
                     do {
                         try await driver.connect(peripheralID: camera.peripheralID)
                         try await action(driver)
+                        let battery = try? await driver.batteryPercentage()
                         driver.disconnect()
-                        return (camera, nil)
+                        return (camera, nil, battery)
                     } catch {
-                        return (camera, error)
+                        return (camera, error, nil)
                     }
                 }
             }
-            for await (camera, error) in group {
+            for await (camera, error, battery) in group {
+                if let battery {
+                    setBattery(camera.id, battery)
+                }
                 if let error {
                     failures.append("\(camera.name): \(error.localizedDescription)")
                     if case CameraError.peripheralNotFound = error {

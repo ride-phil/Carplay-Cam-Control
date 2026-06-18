@@ -6,5 +6,6 @@ struct CamControlWidgetBundle: WidgetBundle {
     var body: some Widget {
         CamControlWidget()
         RecordAllWidget()
+        BatteryWidget()
     }
 }

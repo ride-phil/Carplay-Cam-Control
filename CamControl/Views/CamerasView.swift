@@ -120,6 +120,11 @@ struct CamerasView: View {
                 Text(camera.name)
                     .font(.headline)
                 Spacer()
+                if let battery = manager.batteryLevels[camera.id] {
+                    Label("\(battery)%", systemImage: "battery.100")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text(statusText)
                     .font(.caption)
                     .foregroundStyle(statusColor)

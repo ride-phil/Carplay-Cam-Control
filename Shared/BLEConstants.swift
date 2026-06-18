@@ -18,6 +18,11 @@ enum BLEConstants {
         static let serviceUUID      = CBUUID(string: "FEA6")
         static let writeCharUUID    = CBUUID(string: "B5F90072-AA8D-11E3-9046-0002A5D5C51B")
         static let notifyCharUUID   = CBUUID(string: "B5F90073-AA8D-11E3-9046-0002A5D5C51B")
+        // Separate Query request/response pair — distinct from the Command pair above.
+        // Verified: https://github.com/gopro/OpenGoPro/blob/main/demos/python/tutorial/tutorial_modules/__init__.py
+        // (GOPRO_BASE_UUID = "b5f9{}-aa8d-11e3-9046-0002a5d5c51b", QUERY_REQ/RSP = 0076/0077)
+        static let queryWriteCharUUID  = CBUUID(string: "B5F90076-AA8D-11E3-9046-0002A5D5C51B")
+        static let queryNotifyCharUUID = CBUUID(string: "B5F90077-AA8D-11E3-9046-0002A5D5C51B")
 
         // GoPro general BLE packet format: [payload length, command ID, param length, param bytes...].
         // Verified against gopro/OpenGoPro's official source (CmdId enum + tutorial examples), not guessed:
@@ -30,5 +35,10 @@ enum BLEConstants {
         // EnumPresetGroup: PRESET_GROUP_ID_VIDEO = 1000 (0x03E8), PRESET_GROUP_ID_PHOTO = 1001 (0x03E9)
         static let loadVideoPresetGroup: Data = Data([0x04, 0x3E, 0x02, 0x03, 0xE8])
         static let loadPhotoPresetGroup: Data = Data([0x04, 0x3E, 0x02, 0x03, 0xE9])
+
+        // QueryCmdId.GET_STATUS_VAL = 0x13, StatusId.INTERNAL_BATTERY_PERCENTAGE = 70 (0x46).
+        // Verified: https://github.com/gopro/OpenGoPro/blob/main/demos/python/tutorial/tutorial_modules/tutorial_4_ble_queries/ble_query_poll_resolution_value.py
+        static let batteryStatusId: UInt8 = 70
+        static let getBatteryStatus: Data = Data([0x02, 0x13, batteryStatusId])
     }
 }
