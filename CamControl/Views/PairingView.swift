@@ -162,6 +162,13 @@ struct PairingView: View {
 
                 Spacer()
 
+                Button {
+                    manager.reconnect(camera)
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+                .disabled(manager.reconnectingCameraID == camera.id)
+
                 Button(role: .destructive) {
                     manager.unpair(camera)
                 } label: {
@@ -169,6 +176,18 @@ struct PairingView: View {
                 }
             }
             .buttonStyle(.bordered)
+
+            if manager.reconnectingCameraID == camera.id {
+                Text("Reconnecting…")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            if camera.name.localizedCaseInsensitiveContains("Ace Pro") {
+                Text("Switch to Photo mode before taking a photo")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }

@@ -3,16 +3,25 @@ import WidgetKit
 
 struct TakePhotoIntent: AppIntent {
     static let title: LocalizedStringResource = "Take Photo"
-    static let description = IntentDescription("Take a photo on the paired action camera")
+    static let description = IntentDescription("Take a photo on the selected camera")
     static let openAppWhenRun: Bool = false
 
+    @Parameter(title: "Camera")
+    var camera: CameraEntity?
+
+    init() {}
+
+    init(camera: CameraEntity) {
+        self.camera = camera
+    }
+
     func perform() async throws -> some IntentResult {
-        // TODO(Stage B): operate on the camera this widget instance is configured for.
-        guard let camera = SharedState.pairedCameras.first else {
+        guard let entity = camera,
+              let paired = SharedState.pairedCameras.first(where: { $0.id == entity.id }) else {
             throw CameraError.peripheralNotFound
         }
-        let driver = CameraDriverFactory.make(for: camera.type)
-        try await driver.connect(peripheralID: camera.id)
+        let driver = CameraDriverFactory.make(for: paired.type)
+        try await driver.connect(peripheralID: paired.peripheralID)
         try await driver.takePhoto()
         driver.disconnect()
         WidgetCenter.shared.reloadAllTimelines()

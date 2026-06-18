@@ -54,10 +54,6 @@ final class Insta360Driver: NSObject, CameraDriver {
     func takePhoto() async throws {
         Self.lastNotifyHex = nil
         try await send(CommandPacket.insta360(.takePhoto))
-        // Diagnostic: give the camera a moment to reply on the notify
-        // characteristic before the caller disconnects, so lastNotifyHex
-        // has a chance to capture its response.
-        try? await Task.sleep(nanoseconds: 600_000_000)
     }
 
     func disconnect() {

@@ -4,11 +4,12 @@ iOS app + Home Screen/CarPlay widget for controlling an action camera over Bluet
 
 ## Status
 
-- **App**: builds, signs, installs via TestFlight. Pairing, Start/Stop recording confirmed working on an Insta360 Ace Pro and an Insta360 X4 — both expose the same BLE service/protocol, handled by one `Insta360Driver`.
-- **Multi-camera**: the app can pair and control more than one camera at once (per-camera Record/Stop/Photo, plus a "Record All / Stop All / Photo — All Cameras" batch control that runs concurrently across all paired cameras). The Home Screen/CarPlay widget still controls only the first paired camera — making it per-camera-configurable, plus a separate "Record All" widget, is tracked below.
-- **Widget**: confirmed working — shows live paired/recording state, Record/Stop/Photo buttons trigger real camera commands via `AppIntents`.
+- **App**: builds, signs, installs via TestFlight. Pairing, Start/Stop recording, and photo capture confirmed working reliably on an Insta360 X3 and an Insta360 X4, in any camera mode — both expose the same BLE service/protocol, handled by one `Insta360Driver`.
+- **Multi-camera**: the app can pair and control more than one camera at once (per-camera Record/Stop/Photo, plus a "Record All / Stop All / Photo — All Cameras" batch control that runs concurrently across all paired cameras).
+- **Reconnect after power cycle**: the app has no live connectivity awareness — "Ready" only means "in the paired list," not "currently reachable." Power-cycling a camera (at least the Ace Pro, observed) can give it a new CoreBluetooth peripheral identity if the camera doesn't support BLE bonding, so the old stored identity stops resolving and commands fail. Each paired camera row has a "Reconnect" button (re-scans for a peripheral with the same advertised name and rebinds it) so this doesn't require a full unpair/re-pair. Background/always-on awareness (detecting power-off live, auto-reconnecting without user action) is a separate, much larger effort — see Known open items.
+- **Widgets**: two widget kinds, both untested on a real device so far. `CamControlWidget` is per-camera and configurable — each placed instance is set (via "Edit Widget") to control one specific paired camera, via a `CameraEntity`/`SelectCameraIntent` (`AppIntentConfiguration`); add multiple instances to control multiple cameras. `RecordAllWidget` is a second, non-configurable widget that fans out Record/Stop/Photo to every paired camera concurrently.
 - **CarPlay**: not yet verified. The widget already meets Apple's requirement for automatic CarPlay Dashboard inclusion (`.supportedFamilies([.systemSmall])`), so it *should* show up under CarPlay's widget gallery once added to the iPhone Home Screen — untested on an actual unit.
-- **Photo capture**: works on the X4 directly. On the Ace Pro, the camera must be manually switched to Photo mode first — the BLE opcode used (`0x03`) was never sourced from real protocol documentation (it was a scaffolding-time guess), and is likely a generic "shutter" trigger that's mode-dependent rather than a dedicated "snapshot" command. Also does **not** work on either camera while recording video, for the same reason. `Insta360Driver` now logs (`os.log`, category `Insta360BLE`) and surfaces in the app UI ("Debug — Last Camera Response") the raw bytes the camera sends back after a photo command, to gather real protocol data instead of guessing at new opcodes — needs testing against both cameras in both modes.
+- **Photo capture**: reliable on the X3/X4 in any mode. On the **Insta360 Ace Pro specifically**, `0x03` does nothing while the camera is in Video mode — confirmed via real device testing — but works once manually switched to Photo mode first. The app shows an Ace Pro–specific in-app hint about this. Investigated via `Insta360Driver`'s notify-response logging (`os.log` category `Insta360BLE`): the BE82 notify packet is byte-for-byte identical across both camera models and both outcomes (success/fail) in every capture taken — it acks "command received," not the result — so there's no software-detectable signal to work around this from inside our own driver. Fixing `0x03` to work on the Ace Pro without a manual mode switch would require a genuine BLE packet capture of the official Insta360 app actually switching modes; not something fixable by guessing at undocumented opcodes.
 
 ## Architecture
 
@@ -18,11 +19,13 @@ CamControl/                Main app — SwiftUI, BLE pairing UI, camera controls
   Views/PairingView.swift         Pair/scan UI + Record/Stop/Photo buttons
 
 CamControlWidget/          WidgetKit extension (Home Screen / CarPlay widget)
-  CamControlWidget.swift          Widget UI + TimelineProvider
-  Intents/                        AppIntents for Record/Stop/Photo (run widget-side)
+  CamControlWidget.swift          Per-camera configurable widget UI + AppIntentTimelineProvider
+  RecordAllWidget.swift           Non-configurable widget controlling every paired camera at once
+  Intents/                        AppIntents for Record/Stop/Photo (per-camera and *All variants, run widget-side)
 
 Shared/                    Code shared between app and widget targets
-  PairedCamera.swift              One paired camera (peripheral UUID, type, real BLE device name)
+  PairedCamera.swift              One paired camera — stable app-level `id` (recording state, widget config) vs. volatile `peripheralID` (current CoreBluetooth identity, used to connect)
+  CameraEntity.swift               AppEntity wrapper around PairedCamera, used by widget configuration UI
   SharedState.swift               App Group-backed UserDefaults — list of paired cameras + per-camera recording state
   CameraDriver*.swift             Per-protocol-family BLE command driver (Insta360 implemented and covers multiple Insta360 models; GoPro/DJI scaffolded, unverified)
 ```
@@ -75,8 +78,9 @@ Requires an `app_store_connect` environment variable group (set in Codemagic app
 
 ## Known open items
 
-- [ ] Find the correct Insta360 BLE photo-capture opcode/sequence — `0x03` requires the Ace Pro to already be in Photo mode and doesn't work on either camera while recording. Debug logging is in place (`Insta360Driver.lastNotifyHex`, shown in-app); needs a test pass against both cameras in both modes to capture real response bytes
-- [ ] Verify widget actually appears in CarPlay's widget gallery on a real unit
+- [ ] Find the correct Insta360 BLE photo-capture opcode/sequence so the Ace Pro doesn't require manually switching to Photo mode first — confirmed not solvable via the existing BLE notify channel (see Photo capture status above); needs a real packet capture of the official Insta360 app switching camera modes
+- [ ] Verify both widgets actually appear in CarPlay's widget gallery on a real unit
+- [ ] Verify the per-camera widget's configuration UI (camera picker via `CameraEntity`/`SelectCameraIntent`) actually works as expected on a real device — untested since being built
 - [ ] GoPro and DJI camera drivers are scaffolded but unverified against real hardware
 - [ ] Placeholder app icon (`CamControl/Assets.xcassets/AppIcon.appiconset/icon-1024.png`) needs real branding before any public release
-- [ ] Make the per-camera widget configurable (`AppIntentConfiguration` + `CameraEntity`/`EntityQuery`) so each placed instance targets a specific paired camera, and add a separate, non-configurable "Record All" widget that fans out to every paired camera — until then the existing widget only controls the first paired camera
+- [ ] Background/always-on connectivity awareness (detect camera power-off/on live, not just via manual "Reconnect") — main-app-only (widget extensions can't run persistently), requires `bluetooth-central` background mode + switching from connect-per-command to persistent connections, only works while the app process is resident, and may still need a manual re-scan if the camera doesn't preserve BLE identity across power cycles

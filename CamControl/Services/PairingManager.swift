@@ -11,12 +11,15 @@ final class PairingManager: NSObject, ObservableObject {
     @Published var isPairing = false
     @Published var isSendingCommand = false
     @Published var errorMessage: String?
+    /// Stable id of the paired camera currently being re-scanned for, if any.
+    @Published var reconnectingCameraID: UUID?
     /// Raw bytes from the camera's last BLE response after a photo command —
     /// diagnostic only, for investigating mode-dependent behavior (e.g. Ace Pro).
     @Published var lastDebugResponse: String?
 
     private var central: CBCentralManager!
     private var pairingTarget: CBPeripheral?
+    private var reconnectTimeoutTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -38,6 +41,10 @@ final class PairingManager: NSObject, ObservableObject {
     func stopScanning() {
         central.stopScan()
         isScanning = false
+        if reconnectingCameraID != nil {
+            reconnectTimeoutTask?.cancel()
+            reconnectingCameraID = nil
+        }
     }
 
     func pair(_ peripheral: CBPeripheral) {
@@ -47,6 +54,34 @@ final class PairingManager: NSObject, ObservableObject {
         pairingTarget = peripheral
         peripheral.delegate = self
         central.connect(peripheral)
+    }
+
+    /// Re-scans for a previously paired camera by name and rebinds its
+    /// BLE peripheral identity in place, without losing its stable id,
+    /// recording state, or widget configuration. Needed because some
+    /// cameras (e.g. without BLE bonding) get a new peripheral identity
+    /// from iOS after a power cycle, so the old one stops resolving.
+    func reconnect(_ camera: PairedCamera) {
+        guard central.state == .poweredOn else { errorMessage = "Bluetooth is not available"; return }
+        stopScanning()
+        discoveredPeripherals = []
+        errorMessage = nil
+        reconnectingCameraID = camera.id
+        isScanning = true
+        let services = [BLEConstants.Insta360.serviceUUID, BLEConstants.GoPro.serviceUUID]
+        central.scanForPeripherals(withServices: services)
+
+        reconnectTimeoutTask?.cancel()
+        reconnectTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.reconnectingCameraID == camera.id else { return }
+                self.stopScanning()
+                self.reconnectingCameraID = nil
+                self.errorMessage = "\(camera.name): not found — make sure it's powered on and nearby"
+            }
+        }
     }
 
     func unpair(_ camera: PairedCamera) {
@@ -99,7 +134,7 @@ final class PairingManager: NSObject, ObservableObject {
         errorMessage = nil
         let driver = CameraDriverFactory.make(for: camera.type)
         do {
-            try await driver.connect(peripheralID: camera.id)
+            try await driver.connect(peripheralID: camera.peripheralID)
             try await action(driver)
             driver.disconnect()
         } catch {
@@ -125,7 +160,7 @@ final class PairingManager: NSObject, ObservableObject {
                 group.addTask {
                     let driver = CameraDriverFactory.make(for: camera.type)
                     do {
-                        try await driver.connect(peripheralID: camera.id)
+                        try await driver.connect(peripheralID: camera.peripheralID)
                         try await action(driver)
                         driver.disconnect()
                         return (camera, nil)
@@ -157,6 +192,13 @@ final class PairingManager: NSObject, ObservableObject {
         }
         return nil
     }
+
+    private func rebind(_ camera: PairedCamera, to peripheral: CBPeripheral) {
+        guard let index = pairedCameras.firstIndex(where: { $0.id == camera.id }) else { return }
+        pairedCameras[index].peripheralID = peripheral.identifier
+        SharedState.pairedCameras = pairedCameras
+        WidgetCenter.shared.reloadAllTimelines()
+    }
 }
 
 extension PairingManager: CBCentralManagerDelegate {
@@ -167,7 +209,16 @@ extension PairingManager: CBCentralManagerDelegate {
     nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                          advertisementData: [String: Any], rssi RSSI: NSNumber) {
         Task { @MainActor in
-            if !discoveredPeripherals.contains(peripheral) {
+            if let targetID = reconnectingCameraID,
+               let target = pairedCameras.first(where: { $0.id == targetID }),
+               peripheral.name == target.name {
+                reconnectTimeoutTask?.cancel()
+                stopScanning()
+                reconnectingCameraID = nil
+                rebind(target, to: peripheral)
+                return
+            }
+            if reconnectingCameraID == nil, !discoveredPeripherals.contains(peripheral) {
                 discoveredPeripherals.append(peripheral)
             }
         }
@@ -211,8 +262,13 @@ extension PairingManager: CBPeripheralDelegate {
             guard let type = cameraType(for: peripheral) else {
                 isPairing = false; errorMessage = "Unrecognised camera type"; return
             }
-            let camera = PairedCamera(id: peripheral.identifier, type: type, name: peripheral.name ?? type.displayName)
-            if !pairedCameras.contains(where: { $0.id == camera.id }) {
+            let name = peripheral.name ?? type.displayName
+            if let index = pairedCameras.firstIndex(where: { $0.peripheralID == peripheral.identifier || $0.name == name }) {
+                // Already paired (or reappearing under a new peripheral identity) — rebind rather than duplicate.
+                pairedCameras[index].peripheralID = peripheral.identifier
+                SharedState.pairedCameras = pairedCameras
+            } else {
+                let camera = PairedCamera(id: UUID(), peripheralID: peripheral.identifier, type: type, name: name)
                 pairedCameras.append(camera)
                 SharedState.pairedCameras = pairedCameras
             }
