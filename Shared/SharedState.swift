@@ -21,12 +21,16 @@ struct SharedState {
         set {
             let data = try? JSONEncoder().encode(newValue)
             defaults.set(data, forKey: Keys.pairedCameras)
+            CrossProcessNotifier.notifyStateChanged()
         }
     }
 
     static var recordingCameraUUIDs: Set<UUID> {
         get { Set((defaults.stringArray(forKey: Keys.recordingUUIDs) ?? []).compactMap(UUID.init)) }
-        set { defaults.set(newValue.map(\.uuidString), forKey: Keys.recordingUUIDs) }
+        set {
+            defaults.set(newValue.map(\.uuidString), forKey: Keys.recordingUUIDs)
+            CrossProcessNotifier.notifyStateChanged()
+        }
     }
 
     static func isRecording(_ id: UUID) -> Bool {
@@ -44,7 +48,10 @@ struct SharedState {
     /// stored property of the pairing itself.
     static var unreachableCameraUUIDs: Set<UUID> {
         get { Set((defaults.stringArray(forKey: Keys.unreachableUUIDs) ?? []).compactMap(UUID.init)) }
-        set { defaults.set(newValue.map(\.uuidString), forKey: Keys.unreachableUUIDs) }
+        set {
+            defaults.set(newValue.map(\.uuidString), forKey: Keys.unreachableUUIDs)
+            CrossProcessNotifier.notifyStateChanged()
+        }
     }
 
     static func isUnreachable(_ id: UUID) -> Bool {

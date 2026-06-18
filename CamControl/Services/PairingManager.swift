@@ -31,6 +31,18 @@ final class PairingManager: NSObject, ObservableObject {
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: .main)
+        reloadFromSharedState()
+        // The widget extension runs as a separate process — when a widget
+        // intent changes SharedState, this is how the already-running app
+        // finds out and refreshes its in-memory copy.
+        CrossProcessNotifier.observeStateChanged { [weak self] in
+            Task { @MainActor in
+                self?.reloadFromSharedState()
+            }
+        }
+    }
+
+    private func reloadFromSharedState() {
         pairedCameras = SharedState.pairedCameras
         recordingUUIDs = SharedState.recordingCameraUUIDs
         unreachableCameraIDs = SharedState.unreachableCameraUUIDs

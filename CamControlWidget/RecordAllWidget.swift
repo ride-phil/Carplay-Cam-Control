@@ -47,38 +47,21 @@ struct AllCamerasWidgetView: View {
             ? "\(entry.recordingCount)/\(entry.totalCount) REC"
             : (entry.unreachableCount > 0 ? "\(entry.unreachableCount)/\(entry.totalCount) Unreachable" : "\(entry.totalCount) Ready")
 
-        return VStack(spacing: 10) {
-            HStack(spacing: 6) {
+        return VStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Circle()
                     .fill(statusColor)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 6, height: 6)
                 Text(statusText)
                     .font(.caption2.bold())
                     .foregroundStyle(statusColor)
             }
 
-            Button(intent: RecordAllIntent()) {
-                Label("Record All", systemImage: "record.circle.fill")
-                    .font(.callout.bold())
-                    .foregroundStyle(.red)
-            }
-            .buttonStyle(.plain)
-
-            Button(intent: StopAllIntent()) {
-                Label("Stop All", systemImage: "stop.circle.fill")
-                    .font(.callout.bold())
-                    .foregroundStyle(.primary)
-            }
-            .buttonStyle(.plain)
-
-            Button(intent: PhotoAllIntent()) {
-                Label("Photo All", systemImage: "camera.circle.fill")
-                    .font(.caption.bold())
-                    .foregroundStyle(.blue)
-            }
-            .buttonStyle(.plain)
+            WidgetActionButton(title: "Record All", icon: "record.circle.fill", color: .red, intent: RecordAllIntent())
+            WidgetActionButton(title: "Stop All", icon: "stop.circle.fill", color: .primary, intent: StopAllIntent())
+            WidgetActionButton(title: "Photo All", icon: "camera.circle.fill", color: .blue, intent: PhotoAllIntent())
         }
-        .padding(10)
+        .padding(8)
         .containerBackground(.black, for: .widget)
     }
 

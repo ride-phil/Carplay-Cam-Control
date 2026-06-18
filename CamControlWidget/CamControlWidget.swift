@@ -61,45 +61,30 @@ struct WidgetView: View {
         let statusColor: Color = entry.isUnreachable ? .orange : (entry.isRecording ? .red : .green)
         let statusText = entry.isUnreachable ? "Unreachable" : (entry.isRecording ? "REC" : "Ready")
 
-        return VStack(spacing: 10) {
-            HStack(spacing: 6) {
+        return VStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Circle()
                     .fill(statusColor)
-                    .frame(width: 8, height: 8)
-                Text(statusText)
+                    .frame(width: 6, height: 6)
+                Text(entry.cameraName)
                     .font(.caption2.bold())
+                    .lineLimit(1)
+                Spacer(minLength: 2)
+                Text(statusText)
+                    .font(.caption2)
                     .foregroundStyle(statusColor)
             }
 
-            Text(entry.cameraName)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            WidgetActionButton(title: "Record", icon: "record.circle.fill", color: .red,
+                                intent: StartRecordingIntent(camera: camera), isDisabled: entry.isRecording)
 
-            Button(intent: StartRecordingIntent(camera: camera)) {
-                Label("Record", systemImage: "record.circle.fill")
-                    .font(.callout.bold())
-                    .foregroundStyle(.red)
-            }
-            .buttonStyle(.plain)
-            .disabled(entry.isRecording)
+            WidgetActionButton(title: "Stop", icon: "stop.circle.fill", color: .primary,
+                                intent: StopRecordingIntent(camera: camera), isDisabled: !entry.isRecording)
 
-            Button(intent: StopRecordingIntent(camera: camera)) {
-                Label("Stop", systemImage: "stop.circle.fill")
-                    .font(.callout.bold())
-                    .foregroundStyle(.primary)
-            }
-            .buttonStyle(.plain)
-            .disabled(!entry.isRecording)
-
-            Button(intent: TakePhotoIntent(camera: camera)) {
-                Label("Photo", systemImage: "camera.circle.fill")
-                    .font(.caption.bold())
-                    .foregroundStyle(.blue)
-            }
-            .buttonStyle(.plain)
+            WidgetActionButton(title: "Photo", icon: "camera.circle.fill", color: .blue,
+                                intent: TakePhotoIntent(camera: camera))
         }
-        .padding(10)
+        .padding(8)
         .containerBackground(.black, for: .widget)
     }
 
