@@ -23,7 +23,10 @@ final class PairingManager: NSObject, ObservableObject {
 
     private var central: CBCentralManager!
     private var pairingTarget: CBPeripheral?
-    private var reconnectTimeoutTask: Task<Void, Never>?
+    private var scanTimeoutTask: Task<Void, Never>?
+
+    private static let scanTimeoutNanos: UInt64 = 30_000_000_000
+    private static let reconnectTimeoutNanos: UInt64 = 10_000_000_000
 
     override init() {
         super.init()
@@ -41,15 +44,26 @@ final class PairingManager: NSObject, ObservableObject {
         // Scan for all supported camera service UUIDs
         let services = [BLEConstants.Insta360.serviceUUID, BLEConstants.GoPro.serviceUUID]
         central.scanForPeripherals(withServices: services)
+
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.scanTimeoutNanos)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.isScanning, self.reconnectingCameraID == nil else { return }
+                self.stopScanning()
+                if self.discoveredPeripherals.isEmpty {
+                    self.errorMessage = "No cameras found nearby."
+                }
+            }
+        }
     }
 
     func stopScanning() {
         central.stopScan()
         isScanning = false
-        if reconnectingCameraID != nil {
-            reconnectTimeoutTask?.cancel()
-            reconnectingCameraID = nil
-        }
+        scanTimeoutTask?.cancel()
+        reconnectingCameraID = nil
     }
 
     func pair(_ peripheral: CBPeripheral) {
@@ -76,14 +90,13 @@ final class PairingManager: NSObject, ObservableObject {
         let services = [BLEConstants.Insta360.serviceUUID, BLEConstants.GoPro.serviceUUID]
         central.scanForPeripherals(withServices: services)
 
-        reconnectTimeoutTask?.cancel()
-        reconnectTimeoutTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 10_000_000_000)
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.reconnectTimeoutNanos)
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self, self.reconnectingCameraID == camera.id else { return }
                 self.stopScanning()
-                self.reconnectingCameraID = nil
                 self.errorMessage = "\(camera.name): not found — make sure it's powered on and nearby"
                 self.setUnreachable(camera.id, true)
             }
@@ -234,7 +247,7 @@ extension PairingManager: CBCentralManagerDelegate {
             if let targetID = reconnectingCameraID,
                let target = pairedCameras.first(where: { $0.id == targetID }),
                peripheral.name == target.name {
-                reconnectTimeoutTask?.cancel()
+                scanTimeoutTask?.cancel()
                 stopScanning()
                 reconnectingCameraID = nil
                 rebind(target, to: peripheral)
