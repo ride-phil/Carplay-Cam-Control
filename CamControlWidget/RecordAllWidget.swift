@@ -19,7 +19,9 @@ struct AllCamerasProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<AllCamerasEntry>) -> Void) {
-        completion(Timeline(entries: [entry()], policy: .never))
+        // Self-corrects on a 20s cadence on top of the explicit reloadAllTimelines()
+        // calls every intent makes — see CamControlWidget.Provider for why.
+        completion(Timeline(entries: [entry()], policy: .after(.now.addingTimeInterval(20))))
     }
 
     private func entry() -> AllCamerasEntry {

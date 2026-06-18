@@ -19,8 +19,13 @@ struct SharedState {
             return cameras
         }
         set {
+            let store = defaults
             let data = try? JSONEncoder().encode(newValue)
-            defaults.set(data, forKey: Keys.pairedCameras)
+            store.set(data, forKey: Keys.pairedCameras)
+            // Force an immediate flush — App Group UserDefaults can otherwise
+            // have a brief cross-process visibility delay between the app
+            // and the widget extension.
+            store.synchronize()
             CrossProcessNotifier.notifyStateChanged()
         }
     }
@@ -28,7 +33,9 @@ struct SharedState {
     static var recordingCameraUUIDs: Set<UUID> {
         get { Set((defaults.stringArray(forKey: Keys.recordingUUIDs) ?? []).compactMap(UUID.init)) }
         set {
-            defaults.set(newValue.map(\.uuidString), forKey: Keys.recordingUUIDs)
+            let store = defaults
+            store.set(newValue.map(\.uuidString), forKey: Keys.recordingUUIDs)
+            store.synchronize()
             CrossProcessNotifier.notifyStateChanged()
         }
     }
@@ -49,7 +56,9 @@ struct SharedState {
     static var unreachableCameraUUIDs: Set<UUID> {
         get { Set((defaults.stringArray(forKey: Keys.unreachableUUIDs) ?? []).compactMap(UUID.init)) }
         set {
-            defaults.set(newValue.map(\.uuidString), forKey: Keys.unreachableUUIDs)
+            let store = defaults
+            store.set(newValue.map(\.uuidString), forKey: Keys.unreachableUUIDs)
+            store.synchronize()
             CrossProcessNotifier.notifyStateChanged()
         }
     }
